@@ -41,7 +41,7 @@ DB_PASSWORD=${db_password}
 EOF
 
 # Create docker-compose file for production
-cat > docker-compose.prod.yml << 'EOF'
+cat > docker-compose.prod.yml << "EOF"
 version: '3.8'
 
 services:
@@ -51,13 +51,13 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=$${DATABASE_URL}
     restart: unless-stopped
     depends_on:
       - traefik
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.magic8ball.rule=Host(`magic8ball.traefik.me`)"
+      - "traefik.http.routers.magic8ball.rule=Host(\`magic8ball.traefik.me\`)"
       - "traefik.http.routers.magic8ball.entrypoints=websecure"
       - "traefik.http.routers.magic8ball.tls.certresolver=myresolver"
       - "traefik.http.services.magic8ball.loadbalancer.server.port=3000"
@@ -89,7 +89,7 @@ services:
       - traefik-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.traefik.rule=Host(`traefik.traefik.me`)"
+      - "traefik.http.routers.traefik.rule=Host(\`traefik.traefik.me\`)"
       - "traefik.http.routers.traefik.entrypoints=websecure"
       - "traefik.http.routers.traefik.tls.certresolver=myresolver"
       - "traefik.http.routers.traefik.service=api@internal"
@@ -100,7 +100,7 @@ networks:
 EOF
 
 # Create systemd service for the application
-cat > /etc/systemd/system/magic8ball.service << 'EOF'
+cat > /etc/systemd/system/magic8ball.service << "EOF"
 [Unit]
 Description=Magic 8-Ball Application
 Requires=docker.service
@@ -123,10 +123,10 @@ systemctl daemon-reload
 systemctl enable magic8ball.service
 
 # Create a script to wait for RDS to be available
-cat > /opt/magic8ball/wait-for-db.sh << 'EOF'
+cat > /opt/magic8ball/wait-for-db.sh << "EOF"
 #!/bin/bash
 echo "Waiting for database to be available..."
-until timeout 1 bash -c "</dev/tcp/${DB_ENDPOINT%:*}/${DB_ENDPOINT##*:}" 2>/dev/null; do
+until timeout 1 bash -c "</dev/tcp/$${DB_ENDPOINT%:*}/$${DB_ENDPOINT##*:}" 2>/dev/null; do
   echo "Database not ready, waiting..."
   sleep 5
 done
@@ -140,7 +140,7 @@ chmod +x /opt/magic8ball/wait-for-db.sh
 systemctl start magic8ball.service
 
 # Setup log rotation
-cat > /etc/logrotate.d/magic8ball << 'EOF'
+cat > /etc/logrotate.d/magic8ball << "EOF"
 /var/log/magic8ball/*.log {
     daily
     missingok
