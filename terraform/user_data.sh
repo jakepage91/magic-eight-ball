@@ -49,7 +49,7 @@ version: '3.8'
 
 services:
   app:
-    image: ghcr.io/jakepage/magic-eight-ball:latest
+    image: ghcr.io/jakepage91/magic-eight-ball:latest
     ports:
       - "3000:3000"
     environment:
@@ -63,6 +63,8 @@ services:
       - "traefik.http.routers.magic8ball.rule=Host(\`magic8ball.PUBLIC_IP_PLACEHOLDER.traefik.me\`)"
       - "traefik.http.routers.magic8ball.entrypoints=websecure"
       - "traefik.http.routers.magic8ball.tls.certresolver=myresolver"
+      - "traefik.http.routers.magic8ball-http.rule=Host(\`magic8ball.PUBLIC_IP_PLACEHOLDER.traefik.me\`)"
+      - "traefik.http.routers.magic8ball-http.entrypoints=web"
       - "traefik.http.services.magic8ball.loadbalancer.server.port=3000"
     networks:
       - traefik-network
@@ -103,6 +105,9 @@ services:
       - "traefik.http.routers.traefik.entrypoints=websecure"
       - "traefik.http.routers.traefik.tls.certresolver=myresolver"
       - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik-http.rule=Host(\`traefik.PUBLIC_IP_PLACEHOLDER.traefik.me\`)"
+      - "traefik.http.routers.traefik-http.entrypoints=web"
+      - "traefik.http.routers.traefik-http.service=api@internal"
 
 networks:
   traefik-network:
