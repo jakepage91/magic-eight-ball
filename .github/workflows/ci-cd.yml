@@ -60,7 +60,7 @@ jobs:
         timeout 60s bash -c 'until pg_isready -h localhost -p 5432 -U magic8ball; do sleep 2; done'
         
         # Run database initialization
-        PGPASSWORD=testpassword psql -h localhost -U magic8ball -d magic_eight_ball -f database/init.sql
+        PGPASSWORD=testpassword psql -h localhost -U magic8ball -d magic_eight_ball -f init.sql
 
     - name: Run tests
       run: npm test
