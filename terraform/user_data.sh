@@ -27,6 +27,9 @@ yum install -y amazon-cloudwatch-agent
 mkdir -p /opt/magic8ball
 cd /opt/magic8ball
 
+# Get the public IP address for traefik.me domain
+PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+
 # Set database environment variables
 export DB_ENDPOINT="${db_endpoint}"
 export DB_NAME="${db_name}"
@@ -36,8 +39,8 @@ export DB_PASSWORD="${db_password}"
 # Create environment file for Docker
 cat > .env << EOF
 NODE_ENV=production
-DATABASE_URL=postgresql://${db_username}:${db_password}@${db_endpoint}:5432/${db_name}
-DB_PASSWORD=${db_password}
+DATABASE_URL=postgresql://$${DB_USERNAME}:$${DB_PASSWORD}@$${DB_ENDPOINT}:5432/$${DB_NAME}
+DB_PASSWORD=$${DB_PASSWORD}
 EOF
 
 # Create docker-compose file for production
@@ -57,12 +60,18 @@ services:
       - traefik
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.magic8ball.rule=Host(\`magic8ball.traefik.me\`)"
+      - "traefik.http.routers.magic8ball.rule=Host(\`magic8ball.PUBLIC_IP_PLACEHOLDER.traefik.me\`)"
       - "traefik.http.routers.magic8ball.entrypoints=websecure"
       - "traefik.http.routers.magic8ball.tls.certresolver=myresolver"
       - "traefik.http.services.magic8ball.loadbalancer.server.port=3000"
     networks:
       - traefik-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   traefik:
     image: traefik:v3.0
@@ -74,9 +83,10 @@ services:
       - "--entrypoints.websecure.address=:443"
       - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
       - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.myresolver.acme.email=jake@example.com"
+      - "--certificatesresolvers.myresolver.acme.email=jakepage@gmail.com"
       - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
       - "--global.sendanonymoususage=false"
+      - "--log.level=INFO"
     ports:
       - "80:80"
       - "443:443"
@@ -89,7 +99,7 @@ services:
       - traefik-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.traefik.rule=Host(\`traefik.traefik.me\`)"
+      - "traefik.http.routers.traefik.rule=Host(\`traefik.PUBLIC_IP_PLACEHOLDER.traefik.me\`)"
       - "traefik.http.routers.traefik.entrypoints=websecure"
       - "traefik.http.routers.traefik.tls.certresolver=myresolver"
       - "traefik.http.routers.traefik.service=api@internal"
@@ -97,7 +107,13 @@ services:
 networks:
   traefik-network:
     driver: bridge
+
+volumes:
+  letsencrypt_data:
 EOF
+
+# Replace placeholder with actual IP
+sed -i "s/PUBLIC_IP_PLACEHOLDER/$${PUBLIC_IP}/g" docker-compose.prod.yml
 
 # Create systemd service for the application
 cat > /etc/systemd/system/magic8ball.service << "EOF"
@@ -112,7 +128,7 @@ RemainAfterExit=yes
 WorkingDirectory=/opt/magic8ball
 ExecStart=/usr/local/bin/docker-compose -f docker-compose.prod.yml up -d
 ExecStop=/usr/local/bin/docker-compose -f docker-compose.prod.yml down
-TimeoutStartSec=0
+TimeoutStartSec=300
 
 [Install]
 WantedBy=multi-user.target
@@ -126,7 +142,7 @@ systemctl enable magic8ball.service
 cat > /opt/magic8ball/wait-for-db.sh << "EOF"
 #!/bin/bash
 echo "Waiting for database to be available..."
-until timeout 1 bash -c "</dev/tcp/$${DB_ENDPOINT%:*}/$${DB_ENDPOINT##*:}" 2>/dev/null; do
+until timeout 1 bash -c "</dev/tcp/$${DB_ENDPOINT%:*}/5432" 2>/dev/null; do
   echo "Database not ready, waiting..."
   sleep 5
 done

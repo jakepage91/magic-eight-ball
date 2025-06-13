@@ -61,12 +61,12 @@ output "database_security_group_id" {
 
 output "application_url" {
   description = "URL to access the Magic 8-Ball application"
-  value       = "https://magic8ball.traefik.me"
+  value       = "http://magic8ball.${aws_instance.web_server.public_ip}.traefik.me"
 }
 
 output "traefik_dashboard_url" {
   description = "URL to access the Traefik dashboard"
-  value       = "https://traefik.traefik.me"
+  value       = "http://traefik.${aws_instance.web_server.public_ip}.traefik.me"
 }
 
 output "ssh_command" {
@@ -80,7 +80,7 @@ output "deployment_info" {
     instance_id   = aws_instance.web_server.id
     public_ip     = aws_instance.web_server.public_ip
     region        = var.aws_region
-    app_url       = "https://magic8ball.traefik.me"
-    dashboard_url = "https://traefik.traefik.me"
+    app_url       = "http://magic8ball.${aws_instance.web_server.public_ip}.traefik.me"
+    dashboard_url = "http://traefik.${aws_instance.web_server.public_ip}.traefik.me"
   }
 } 
