@@ -10,7 +10,7 @@ A comprehensive demonstration application showcasing the full software developme
 - **Containerization**: Docker multi-stage builds
 - **CI/CD Pipeline**: GitHub Actions with automated testing and deployment
 - **Infrastructure as Code**: Terraform for AWS resources
-- **Public DNS**: Automatic SSL certificates via Traefik and traefik.me
+- **Public DNS**: Simple domain resolution via sslip.io
 - **Security Best Practices**: Non-root containers, encrypted storage, IAM roles
 
 ## 🏗️ Architecture
@@ -24,9 +24,9 @@ A comprehensive demonstration application showcasing the full software developme
                                                         │
                                                         ▼
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Traefik.me    │    │   AWS EC2       │    │   AWS RDS       │
+│   sslip.io      │    │   AWS EC2       │    │   AWS RDS       │
 │   DNS + SSL     │◀───│   Instance      │───▶│  PostgreSQL     │
-│                 │    │  (Traefik)      │    │   Database      │
+│                 │    │  (Direct Port)  │    │   Database      │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
@@ -164,8 +164,8 @@ git push origin main
 
 After successful deployment, access your application at:
 
-- **Application**: https://magic8ball.traefik.me
-- **Traefik Dashboard**: https://traefik.traefik.me
+- **Application**: http://magic8ball.IP.sslip.io (replace IP with actual public IP)
+- **Direct IP Access**: http://IP (replace IP with actual public IP)
 - **Direct IP**: http://YOUR_EC2_PUBLIC_IP
 
 ## 🧪 Testing

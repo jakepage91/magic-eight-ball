@@ -146,14 +146,7 @@ resource "aws_security_group" "web_server" {
     cidr_blocks = var.allowed_ssh_cidrs
   }
 
-  # Traefik Dashboard
-  ingress {
-    description = "Traefik Dashboard"
-    from_port   = 8080
-    to_port     = 8080
-    protocol    = "tcp"
-    cidr_blocks = var.allowed_ssh_cidrs
-  }
+
 
   # All outbound traffic
   egress {

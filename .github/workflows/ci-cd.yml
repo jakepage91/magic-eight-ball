@@ -174,13 +174,7 @@ jobs:
         # Update the docker-compose file with new image and correct domains
         sudo sed -i "s|image: ghcr.io/jakepage91/magic-eight-ball:.*|image: $IMAGE_TAG|g" docker-compose.prod.yml
         
-        # Update domain names to use current IP
-        sudo sed -i "s/magic8ball\.[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\.traefik\.me/magic8ball.$INSTANCE_IP.traefik.me/g" docker-compose.prod.yml
-        sudo sed -i "s/traefik\.[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\.traefik\.me/traefik.$INSTANCE_IP.traefik.me/g" docker-compose.prod.yml
-        
-        # Also handle the case where domains don't have IP yet
-        sudo sed -i "s/magic8ball\.traefik\.me/magic8ball.$INSTANCE_IP.traefik.me/g" docker-compose.prod.yml
-        sudo sed -i "s/traefik\.traefik\.me/traefik.$INSTANCE_IP.traefik.me/g" docker-compose.prod.yml
+        # Note: No domain updates needed for sslip.io - it automatically resolves based on IP
         
         # Pull the new image
         sudo docker pull "$IMAGE_TAG"
@@ -192,8 +186,8 @@ jobs:
         sudo docker image prune -f || true
         
         echo "Deployment complete!"
-        echo "Application URL: http://magic8ball.$INSTANCE_IP.traefik.me"
-        echo "Dashboard URL: http://traefik.$INSTANCE_IP.traefik.me"
+        echo "Application URL: http://magic8ball.$INSTANCE_IP.sslip.io"
+        echo "Direct IP URL: http://$INSTANCE_IP"
         EOF
         
         # Make script executable and copy to EC2
@@ -218,4 +212,4 @@ jobs:
             --output text) || echo "Deployment may still be in progress"
         
         echo "Deployment initiated successfully!"
-        echo "Application will be available at: http://magic8ball.$INSTANCE_IP.traefik.me" 
+        echo "Application will be available at: http://magic8ball.$INSTANCE_IP.sslip.io" 

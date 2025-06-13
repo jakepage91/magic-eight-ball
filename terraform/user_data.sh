@@ -27,9 +27,6 @@ yum install -y amazon-cloudwatch-agent
 mkdir -p /opt/magic8ball
 cd /opt/magic8ball
 
-# Get the public IP address for traefik.me domain
-PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
-
 # Set database environment variables
 export DB_ENDPOINT="${db_endpoint}"
 export DB_NAME="${db_name}"
@@ -39,7 +36,7 @@ export DB_PASSWORD="${db_password}"
 # Create environment file for Docker
 cat > .env << EOF
 NODE_ENV=production
-DATABASE_URL=postgresql://$${DB_USERNAME}:$${DB_PASSWORD}@$${DB_ENDPOINT}:5432/$${DB_NAME}
+DATABASE_URL=postgresql://$${DB_USERNAME}:$${DB_PASSWORD}@$${DB_ENDPOINT}/$${DB_NAME}?sslmode=disable
 DB_PASSWORD=$${DB_PASSWORD}
 EOF
 
@@ -51,23 +48,13 @@ services:
   app:
     image: ghcr.io/jakepage91/magic-eight-ball:latest
     ports:
-      - "3000:3000"
+      - "80:3000"
     environment:
       - NODE_ENV=production
       - DATABASE_URL=$${DATABASE_URL}
     restart: unless-stopped
-    depends_on:
-      - traefik
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.magic8ball.rule=Host(\`magic8ball.PUBLIC_IP_PLACEHOLDER.traefik.me\`)"
-      - "traefik.http.routers.magic8ball.entrypoints=websecure"
-      - "traefik.http.routers.magic8ball.tls.certresolver=myresolver"
-      - "traefik.http.routers.magic8ball-http.rule=Host(\`magic8ball.PUBLIC_IP_PLACEHOLDER.traefik.me\`)"
-      - "traefik.http.routers.magic8ball-http.entrypoints=web"
-      - "traefik.http.services.magic8ball.loadbalancer.server.port=3000"
     networks:
-      - traefik-network
+      - magic8ball-network
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
       interval: 30s
@@ -75,50 +62,10 @@ services:
       retries: 3
       start_period: 40s
 
-  traefik:
-    image: traefik:v3.0
-    command:
-      - "--api.dashboard=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
-      - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.myresolver.acme.email=jakepage@gmail.com"
-      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
-      - "--global.sendanonymoususage=false"
-      - "--log.level=INFO"
-    ports:
-      - "80:80"
-      - "443:443"
-      - "8080:8080"
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "./letsencrypt:/letsencrypt"
-    restart: unless-stopped
-    networks:
-      - traefik-network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.traefik.rule=Host(\`traefik.PUBLIC_IP_PLACEHOLDER.traefik.me\`)"
-      - "traefik.http.routers.traefik.entrypoints=websecure"
-      - "traefik.http.routers.traefik.tls.certresolver=myresolver"
-      - "traefik.http.routers.traefik.service=api@internal"
-      - "traefik.http.routers.traefik-http.rule=Host(\`traefik.PUBLIC_IP_PLACEHOLDER.traefik.me\`)"
-      - "traefik.http.routers.traefik-http.entrypoints=web"
-      - "traefik.http.routers.traefik-http.service=api@internal"
-
 networks:
-  traefik-network:
+  magic8ball-network:
     driver: bridge
-
-volumes:
-  letsencrypt_data:
 EOF
-
-# Replace placeholder with actual IP
-sed -i "s/PUBLIC_IP_PLACEHOLDER/$${PUBLIC_IP}/g" docker-compose.prod.yml
 
 # Create systemd service for the application
 cat > /etc/systemd/system/magic8ball.service << "EOF"
