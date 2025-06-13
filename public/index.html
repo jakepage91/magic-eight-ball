@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magic Eight Ball</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎱 Magic Eight Ball</h1>
+            <p>Ask a question and shake the ball for your answer!</p>
+        </header>
+
+        <main>
+            <div class="eight-ball-container">
+                <div class="eight-ball" id="eightBall">
+                    <div class="ball-surface">
+                        <div class="window">
+                            <div class="answer-display" id="answerDisplay">
+                                <div class="answer-text" id="answerText">Ask a question...</div>
+                            </div>
+                        </div>
+                        <div class="eight">8</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-section">
+                <input type="text" id="questionInput" placeholder="What's your question?" maxlength="200">
+                <button id="askButton">Ask the Magic 8-Ball</button>
+            </div>
+
+            <div class="loading" id="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Consulting the mystic powers...</p>
+            </div>
+        </main>
+
+        <section class="history-section">
+            <h2>Recent Questions</h2>
+            <div class="history-list" id="historyList">
+                <!-- History will be populated here -->
+            </div>
+        </section>
+
+        <footer>
+            <p>CI/CD Demo Application | Built with ❤️ for learning</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 

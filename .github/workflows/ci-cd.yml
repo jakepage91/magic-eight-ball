@@ -1,0 +1,225 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run tests
+      run: npm test
+
+    - name: Run linting (if available)
+      run: |
+        if npm list eslint 2>/dev/null; then
+          npm run lint
+        else
+          echo "ESLint not configured, skipping..."
+        fi
+      continue-on-error: true
+
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tag: ${{ steps.meta.outputs.tags }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  deploy:
+    needs: [test, build-and-push]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Deploy to EC2
+      run: |
+        # Get the latest image tag
+        IMAGE_TAG="${{ needs.build-and-push.outputs.image-tag }}"
+        
+        # Create deployment script
+        cat > deploy.sh << 'EOF'
+        #!/bin/bash
+        set -e
+        
+        # Update system
+        sudo yum update -y
+        
+        # Install Docker if not present
+        if ! command -v docker &> /dev/null; then
+            sudo yum install -y docker
+            sudo systemctl start docker
+            sudo systemctl enable docker
+            sudo usermod -a -G docker ec2-user
+        fi
+        
+        # Install Docker Compose if not present
+        if ! command -v docker-compose &> /dev/null; then
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+        fi
+        
+        # Create application directory
+        sudo mkdir -p /opt/magic8ball
+        cd /opt/magic8ball
+        
+        # Pull the latest image
+        echo "${{ secrets.GITHUB_TOKEN }}" | sudo docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        sudo docker pull IMAGE_TAG_PLACEHOLDER
+        
+        # Stop existing containers
+        sudo docker-compose down || true
+        
+        # Create docker-compose for production
+        cat > docker-compose.prod.yml << 'COMPOSE_EOF'
+        version: '3.8'
+        services:
+          app:
+            image: IMAGE_TAG_PLACEHOLDER
+            ports:
+              - "80:3000"
+            environment:
+              - NODE_ENV=production
+              - DATABASE_URL=postgresql://magic8ball:${DB_PASSWORD}@db:5432/magic_eight_ball
+            depends_on:
+              - db
+            restart: unless-stopped
+            labels:
+              - "traefik.enable=true"
+              - "traefik.http.routers.magic8ball.rule=Host(\`magic8ball.traefik.me\`)"
+              - "traefik.http.routers.magic8ball.entrypoints=websecure"
+              - "traefik.http.routers.magic8ball.tls.certresolver=myresolver"
+        
+          db:
+            image: postgres:15-alpine
+            environment:
+              - POSTGRES_DB=magic_eight_ball
+              - POSTGRES_USER=magic8ball
+              - POSTGRES_PASSWORD=${DB_PASSWORD}
+            volumes:
+              - postgres_data:/var/lib/postgresql/data
+            restart: unless-stopped
+        
+          traefik:
+            image: traefik:v3.0
+            command:
+              - "--api.dashboard=true"
+              - "--providers.docker=true"
+              - "--providers.docker.exposedbydefault=false"
+              - "--entrypoints.web.address=:80"
+              - "--entrypoints.websecure.address=:443"
+              - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
+              - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
+              - "--certificatesresolvers.myresolver.acme.email=your-email@example.com"
+              - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+            ports:
+              - "80:80"
+              - "443:443"
+              - "8080:8080"
+            volumes:
+              - "/var/run/docker.sock:/var/run/docker.sock:ro"
+              - "./letsencrypt:/letsencrypt"
+            restart: unless-stopped
+        
+        volumes:
+          postgres_data:
+        COMPOSE_EOF
+        
+        # Set environment variables
+        export DB_PASSWORD="${{ secrets.DB_PASSWORD }}"
+        
+        # Replace placeholder with actual image tag
+        sed -i "s|IMAGE_TAG_PLACEHOLDER|$1|g" docker-compose.prod.yml
+        
+        # Start services
+        sudo -E docker-compose -f docker-compose.prod.yml up -d
+        
+        # Clean up old images
+        sudo docker system prune -f
+        EOF
+        
+        # Make script executable
+        chmod +x deploy.sh
+        
+        # Copy script to EC2 and execute
+        aws ssm send-command \
+          --document-name "AWS-RunShellScript" \
+          --targets "Key=tag:Name,Values=magic8ball-server" \
+          --parameters "commands=[
+            'curl -o /tmp/deploy.sh https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/deploy.sh',
+            'chmod +x /tmp/deploy.sh',
+            '/tmp/deploy.sh $IMAGE_TAG'
+          ]" \
+          --output text \
+          --query 'Command.CommandId' 
