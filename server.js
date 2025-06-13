@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 3000;
 // Database connection
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgresql://localhost:5432/magic_eight_ball',
-  ssl: false
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
 // Middleware
