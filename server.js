@@ -119,10 +119,15 @@ async function initializeDatabase() {
   }
 }
 
-// Start server
-app.listen(PORT, async () => {
-  console.log(`Magic Eight Ball server running on port ${PORT}`);
-  await initializeDatabase();
-});
+// Start server only if not in test mode
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, async () => {
+    console.log(`Magic Eight Ball server running on port ${PORT}`);
+    await initializeDatabase();
+  });
+} else {
+  // Initialize database for tests
+  initializeDatabase();
+}
 
-module.exports = app; 
+module.exports = { app, pool }; 

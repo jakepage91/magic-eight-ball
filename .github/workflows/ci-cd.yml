@@ -13,6 +13,31 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_USER: magic8ball
+          POSTGRES_DB: magic_eight_ball
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://magic8ball:testpassword@localhost:5432/magic_eight_ball
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: magic_eight_ball
+      DB_USER: magic8ball
+      DB_PASSWORD: testpassword
+    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -25,6 +50,17 @@ jobs:
 
     - name: Install dependencies
       run: npm ci
+
+    - name: Install PostgreSQL client
+      run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+    - name: Set up test database
+      run: |
+        # Wait for PostgreSQL to be ready
+        timeout 60s bash -c 'until pg_isready -h localhost -p 5432 -U magic8ball; do sleep 2; done'
+        
+        # Run database initialization
+        PGPASSWORD=testpassword psql -h localhost -U magic8ball -d magic_eight_ball -f database/init.sql
 
     - name: Run tests
       run: npm test
