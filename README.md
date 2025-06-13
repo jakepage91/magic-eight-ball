@@ -317,3 +317,4 @@ MIT License - see LICENSE file for details.
 **Happy Learning! 🎓**
 
 This project demonstrates real-world DevOps practices in a simplified, educational context. Each component is designed to teach specific concepts while working together as a complete system. 
+
